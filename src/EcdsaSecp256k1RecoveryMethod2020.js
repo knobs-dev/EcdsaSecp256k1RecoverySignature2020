@@ -1,6 +1,113 @@
-'use strict';
+"use strict";
 const base64url = require("base64url");
 const ES256KR = require("./ES256K-R");
+
+/**
+ * @ignore
+ * Returns an object with an async sign function.
+ * The sign function is bound to the KeyPair
+ * and then returned by the KeyPair's signer method.
+ * @param {EcdsaSecp256k1RecoveryMethod2020} key - An EcdsaSecp256k1RecoveryMethod2020.
+ *
+ * @returns {{sign: Function}} An object with an async function sign
+ * using the private key passed in.
+ */
+function joseSignerFactory(vm) {
+  if (!vm.privateKeyJwk && !vm.privateKeyHex) {
+    return {
+      async sign() {
+        throw new Error("No private vm to sign with.");
+      },
+    };
+  }
+
+  return {
+    async sign({ data }) {
+      const header = {
+        alg: "ES256K-R",
+        b64: false,
+        crit: ["b64"],
+      };
+      const toBeSigned = Buffer.from(data.buffer, data.byteOffset, data.length);
+      return ES256KR.signDetached(toBeSigned, vm, header);
+    },
+  };
+}
+
+/**
+ * @ignore
+ * Returns an object with an async verify function.
+ * The verify function is bound to the KeyPair
+ * and then returned by the KeyPair's verifier method.
+ * @param {EcdsaSecp256k1RecoveryMethod2020} key - An EcdsaSecp256k1RecoveryMethod2020.
+ *
+ * @returns {{verify: Function}} An async verifier specific
+ * to the key passed in.
+ */
+const joseVerifierFactory = (vm) => {
+  if (
+    vm.publicKeyJwk === undefined &&
+    vm.publicKeyHex === undefined &&
+    vm.blockchainAccountId === undefined &&
+    vm.ethereumAddress === undefined
+  ) {
+    return {
+      async verify() {
+        throw new Error("No vm to verify with.");
+      },
+    };
+  }
+
+  return {
+    async verify({ data, signature }) {
+      const alg = "ES256K-R";
+      const type = "EcdsaSecp256k1RecoveryMethod2020";
+      const [encodedHeader, encodedSignature] = signature.split("..");
+      let header;
+      try {
+        header = JSON.parse(base64url.decode(encodedHeader));
+      } catch (e) {
+        throw new Error("Could not parse JWS header; " + e);
+      }
+      if (!(header && typeof header === "object")) {
+        throw new Error("Invalid JWS header.");
+      }
+
+      if (header.alg !== alg) {
+        throw new Error(
+          `Invalid JWS header, expected ${header.alg} === ${alg}.`
+        );
+      }
+
+      // confirm header matches all expectations
+      if (
+        !(
+          header.alg === alg &&
+          header.b64 === false &&
+          Array.isArray(header.crit) &&
+          header.crit.length === 1 &&
+          header.crit[0] === "b64"
+        ) &&
+        Object.keys(header).length === 3
+      ) {
+        throw new Error(
+          `Invalid JWS header parameters ${JSON.stringify(header)} for ${type}.`
+        );
+      }
+
+      let verified = false;
+
+      const payload = Buffer.from(data.buffer, data.byteOffset, data.length);
+
+      try {
+        verified = ES256KR.verifyDetached(signature, payload, vm);
+      } catch (e) {
+        console.error("An error occurred when verifying signature: ", e);
+      }
+      return verified;
+    },
+  };
+};
 
 class EcdsaSecp256k1RecoveryMethod2020 {
   /**
@@ -128,112 +235,5 @@ class EcdsaSecp256k1RecoveryMethod2020 {
     return publicNode;
   }
 }
-
-/**
- * @ignore
- * Returns an object with an async sign function.
- * The sign function is bound to the KeyPair
- * and then returned by the KeyPair's signer method.
- * @param {EcdsaSecp256k1RecoveryMethod2020} key - An EcdsaSecp256k1RecoveryMethod2020.
- *
- * @returns {{sign: Function}} An object with an async function sign
- * using the private key passed in.
- */
-function joseSignerFactory(vm) {
-  if (!vm.privateKeyJwk && !vm.privateKeyHex) {
-    return {
-      async sign() {
-        throw new Error("No private vm to sign with.");
-      },
-    };
-  }
-
-  return {
-    async sign({ data }) {
-      const header = {
-        alg: "ES256K-R",
-        b64: false,
-        crit: ["b64"],
-      };
-      const toBeSigned = Buffer.from(data.buffer, data.byteOffset, data.length);
-      return ES256KR.signDetached(toBeSigned, vm, header);
-    },
-  };
-}
-
-/**
- * @ignore
- * Returns an object with an async verify function.
- * The verify function is bound to the KeyPair
- * and then returned by the KeyPair's verifier method.
- * @param {EcdsaSecp256k1RecoveryMethod2020} key - An EcdsaSecp256k1RecoveryMethod2020.
- *
- * @returns {{verify: Function}} An async verifier specific
- * to the key passed in.
- */
-const joseVerifierFactory = (vm) => {
-  if (
-    vm.publicKeyJwk === undefined &&
-    vm.publicKeyHex === undefined &&
-    vm.blockchainAccountId === undefined &&
-    vm.ethereumAddress === undefined
-  ) {
-    return {
-      async verify() {
-        throw new Error("No vm to verify with.");
-      },
-    };
-  }
-
-  return {
-    async verify({ data, signature }) {
-      const alg = "ES256K-R";
-      const type = "EcdsaSecp256k1RecoveryMethod2020";
-      const [encodedHeader, encodedSignature] = signature.split("..");
-      let header;
-      try {
-        header = JSON.parse(base64url.decode(encodedHeader));
-      } catch (e) {
-        throw new Error("Could not parse JWS header; " + e);
-      }
-      if (!(header && typeof header === "object")) {
-        throw new Error("Invalid JWS header.");
-      }
-
-      if (header.alg !== alg) {
-        throw new Error(
-          `Invalid JWS header, expected ${header.alg} === ${alg}.`
-        );
-      }
-
-      // confirm header matches all expectations
-      if (
-        !(
-          header.alg === alg &&
-          header.b64 === false &&
-          Array.isArray(header.crit) &&
-          header.crit.length === 1 &&
-          header.crit[0] === "b64"
-        ) &&
-        Object.keys(header).length === 3
-      ) {
-        throw new Error(
-          `Invalid JWS header parameters ${JSON.stringify(header)} for ${type}.`
-        );
-      }
-
-      let verified = false;
-
-      const payload = Buffer.from(data.buffer, data.byteOffset, data.length);
-
-      try {
-        verified = ES256KR.verifyDetached(signature, payload, vm);
-      } catch (e) {
-        console.error("An error occurred when verifying signature: ", e);
-      }
-      return verified;
-    },
-  };
-};
 
 module.exports = EcdsaSecp256k1RecoveryMethod2020;
