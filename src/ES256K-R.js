@@ -122,9 +122,7 @@ const signDetached = async (
     privateKeyUInt8Array = await privateKeyUInt8ArrayFromJWK(vm.privateKeyJwk);
   }
   if (vm.privateKeyHex) {
-    privateKeyUInt8Array = await privateKeyUInt8ArrayFromJWK(
-      await privateJWKFromPrivateKeyHex(vm.privateKeyHex)
-    );
+    privateKeyUInt8Array = hexToBin(vm.privateKeyHex);
   }
 
   const secp256k1 = await instantiateSecp256k1();
@@ -196,9 +194,7 @@ const verifyDetached = async (
     publicKeyUInt8Array = await publicKeyUInt8ArrayFromJWK(vm.publicKeyJwk);
   }
   if (vm.publicKeyHex) {
-    publicKeyUInt8Array = await publicKeyUInt8ArrayFromJWK(
-      await publicJWKFromPublicKeyHex(vm.publicKeyHex)
-    );
+    publicKeyUInt8Array = hexToBin(vm.publicKeyHex);
   }
   // not a public key...
   // if (vm.ethereumAddress) {
@@ -258,8 +254,9 @@ const verifyDetached = async (
   }
 
   if (vm.blockchainAccountId) {
-    const [chainNamespace, chainReference, accountAddress] = vm.blockchainAccountId.split(":");
-    if (chainNamespace === 'eip155') {
+    const [chainNamespace, chainReference, accountAddress] =
+      vm.blockchainAccountId.split(":");
+    if (chainNamespace === "eip155") {
       if (accountAddress === computedRecoveredEthereumAddress) {
         return true;
       }
