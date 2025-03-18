@@ -26,8 +26,8 @@
     "crypto-ld": "^6.0.0",
     "ethereum-public-key-to-address": "^0.0.5",
     "json-stringify-deterministic": "^1.0.1",
-    "jsonld": "^5.2.0",
-    "jsonld-signatures": "^9.3.1"
+     "jsonld": "^8.0.0",
+    "jsonld-signatures": "^11.5.0"
   },
   "devDependencies": {
     "@digitalbazaar/vc": "^2.1.0",
